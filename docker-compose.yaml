@@ -1,0 +1,40 @@
+services:
+  vllm:
+    image: vllm/vllm-openai:latest
+    restart: always
+    shm_size: '64gb'
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.vllm.rule=Host(`${APP_DOMAIN}`)"
+      - "traefik.http.routers.vllm.entrypoints=websecure"
+      - "traefik.http.routers.vllm.tls.certresolver=myresolver"
+    command: ["--model","${APP_MODEL}"]
+
+  traefik:
+    image: "traefik:v3.1"
+    restart: always
+    container_name: "traefik"
+    command:
+      #- "--log.level=DEBUG"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entryPoints.websecure.address=:443"
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.email=${APP_MAIL}"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - "./letsencrypt:/letsencrypt"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+
+
